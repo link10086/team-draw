@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=link10086@users.noreply.github.com -c user.name=link10086 commit -q -m \"团建组织人抽签小程序\")",
+      "Bash(git branch *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(cp \"团建组织人抽签小程序.html\" index.html)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(printf \".claude/\\\\n\")",
+      "Bash(git rm *)"
+    ]
+  }
+}
