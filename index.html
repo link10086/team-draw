@@ -54,6 +54,21 @@
   }
   .quick-add input:focus { outline: none; border-color: #667eea; }
   .quick-add button { flex: 0 0 auto; min-width: 96px; padding: 11px 16px; font-size: 15px; }
+  .name-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; min-height: 20px; }
+  .name-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #eef2ff; color: #3730a3;
+    border: 1px solid #e0e7ff; border-radius: 999px;
+    padding: 6px 8px 6px 14px; font-size: 15px;
+  }
+  .tag-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #c7d2fe; color: #3730a3; font-size: 12px;
+    cursor: pointer; line-height: 1;
+  }
+  .tag-x:hover { background: #f87171; color: #fff; }
+  .tags-empty { color: #a0aec0; font-size: 14px; }
   .option { margin-top: 18px; }
   .option > label { font-weight: 600; }
   .slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
@@ -123,13 +138,13 @@
   <h1>🎲 团建组织人抽签小程序</h1>
 
   <div class="card">
-    <label for="names">输入人名 <span id="savedCount" class="saved-count"></span></label>
-    <textarea id="names" placeholder="每行一个人名，例如：&#10;张三&#10;李四&#10;王五&#10;（也支持用逗号、空格、分号分隔）"></textarea>
-    <div class="hint">支持换行、逗号、分号、空格分隔。重复的名字会自动去重。名单会<b>自动保存</b>在本浏览器，下次打开仍在。</div>
+    <label>团建人员名单 <span id="savedCount" class="saved-count"></span></label>
     <div class="quick-add">
-      <input type="text" id="addName" placeholder="输入单个人名，回车或点「添加」追加到名单">
+      <input type="text" id="addName" placeholder="输入人名，回车或点「添加」（可一次粘贴多个，用空格/逗号/换行分隔）">
       <button class="btn-ghost" id="addBtn">➕ 添加</button>
     </div>
+    <div class="hint">名单会<b>自动保存</b>在本浏览器，下次打开仍在；点标签上的 ✕ 可删除单个人名。</div>
+    <div id="nameTags" class="name-tags"></div>
     <div class="option">
       <label for="bias">上轮靠前的人，本轮靠后的强度</label>
       <div class="slider-row">
@@ -169,58 +184,81 @@
   let rounds = [];     // 保存每一轮的排序结果，用于导出
   let roundInfo = [];  // 保存每一轮使用的偏移强度（null 表示纯随机）
 
-  // 解析输入：按换行/逗号/分号/空格分隔，去除空白并去重
+  // ===== 名单：以 nameList 数组为唯一数据源，保存到浏览器 localStorage =====
+  const STORE_KEY = 'teamDraw.names';
+  let nameList = [];   // 当前名单（已去重）
+
+  // 供随机排序/导出使用：返回当前名单副本
   function parseNames() {
-    const raw = document.getElementById('names').value;
-    const parts = raw.split(/[\n,，;；\s]+/)
-                     .map(s => s.trim())
-                     .filter(s => s.length > 0);
-    // 去重，保留首次出现顺序
-    return [...new Set(parts)];
+    return nameList.slice();
   }
 
-  // ===== 名单持久化（保存到浏览器 localStorage）=====
-  const STORE_KEY = 'teamDraw.names';
-  const namesEl = document.getElementById('names');
-
   function saveNames() {
-    try { localStorage.setItem(STORE_KEY, namesEl.value); } catch (e) {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(nameList)); } catch (e) {}
+    renderTags();
     updateSavedCount();
   }
 
   function loadNames() {
     try {
       const v = localStorage.getItem(STORE_KEY);
-      if (v != null) namesEl.value = v;
+      if (v != null) {
+        let arr = null;
+        try { arr = JSON.parse(v); } catch (e) {}
+        // 兼容旧版本（换行/分隔符保存的纯文本）
+        if (!Array.isArray(arr)) {
+          arr = String(v).split(/[\n,，;；\s]+/);
+        }
+        const seen = new Set();
+        nameList = arr.map(s => String(s).trim())
+                      .filter(s => s && !seen.has(s) && seen.add(s));
+      }
     } catch (e) {}
+    renderTags();
     updateSavedCount();
   }
 
   function updateSavedCount() {
-    const n = parseNames().length;
-    document.getElementById('savedCount').textContent = n > 0 ? `（已保存 ${n} 人）` : '';
+    const n = nameList.length;
+    document.getElementById('savedCount').textContent = n > 0 ? `（共 ${n} 人）` : '';
   }
 
-  // 文本框任何改动都自动保存
-  namesEl.addEventListener('input', saveNames);
+  // 渲染人名标签
+  function renderTags() {
+    const box = document.getElementById('nameTags');
+    if (nameList.length === 0) {
+      box.innerHTML = '<span class="tags-empty">还没有添加人名，请在上方输入后点「添加」</span>';
+      return;
+    }
+    box.innerHTML = nameList.map((n, i) =>
+      `<span class="name-tag">${escapeHtml(n)}<span class="tag-x" data-i="${i}" title="删除">✕</span></span>`
+    ).join('');
+  }
 
-  // 单个添加：追加到名单（自动去重）
+  // 点击 ✕ 删除单个人名（事件委托）
+  document.getElementById('nameTags').addEventListener('click', e => {
+    const x = e.target.closest('.tag-x');
+    if (!x) return;
+    nameList.splice(Number(x.dataset.i), 1);
+    saveNames();
+  });
+
+  // 添加人名（支持一次粘贴多个；自动去重）
   function addOneName() {
     const inp = document.getElementById('addName');
-    const list = parseNames();
-    const seen = new Set(list);
+    const seen = new Set(nameList);
     const toAdd = inp.value.split(/[\n,，;；\s]+/).map(s => s.trim()).filter(Boolean);
     let added = 0;
     toAdd.forEach(name => {
-      if (!seen.has(name)) { list.push(name); seen.add(name); added++; }
+      if (!seen.has(name)) { nameList.push(name); seen.add(name); added++; }
     });
-    namesEl.value = list.join('\n');
     saveNames();
     inp.value = '';
     inp.focus();
     if (toAdd.length > 0 && added === 0) {
+      const orig = inp.getAttribute('placeholder');
       inp.placeholder = '该人名已在名单中';
-      setTimeout(() => { inp.placeholder = '输入单个人名，回车或点「添加」追加到名单'; }, 1500);
+      setTimeout(() => { inp.placeholder = orig; }, 1500);
     }
   }
 
@@ -367,10 +405,10 @@
 
   // 清空名单：连同已保存名单和结果一起清除，需二次确认
   document.getElementById('clearNamesBtn').addEventListener('click', () => {
-    if (parseNames().length > 0 && !confirm('确定要清空整个名单吗？此操作会同时删除已保存的名单，不可恢复。')) {
+    if (nameList.length > 0 && !confirm('确定要清空整个名单吗？此操作会同时删除已保存的名单，不可恢复。')) {
       return;
     }
-    namesEl.value = '';
+    nameList = [];
     saveNames();   // 同步清空已保存名单
     clearResults();
   });
