@@ -46,6 +46,14 @@
   }
   textarea:focus { outline: none; border-color: #667eea; }
   .hint { color: #718096; font-size: 13px; margin-top: 6px; }
+  .saved-count { font-weight: 400; font-size: 13px; color: #667eea; }
+  .quick-add { display: flex; gap: 10px; margin-top: 10px; }
+  .quick-add input {
+    flex: 1; padding: 11px 12px; border: 2px solid #e2e8f0;
+    border-radius: 10px; font-size: 15px; font-family: inherit;
+  }
+  .quick-add input:focus { outline: none; border-color: #667eea; }
+  .quick-add button { flex: 0 0 auto; min-width: 96px; padding: 11px 16px; font-size: 15px; }
   .option { margin-top: 18px; }
   .option > label { font-weight: 600; }
   .slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
@@ -115,9 +123,13 @@
   <h1>🎲 团建组织人抽签小程序</h1>
 
   <div class="card">
-    <label for="names">输入人名</label>
+    <label for="names">输入人名 <span id="savedCount" class="saved-count"></span></label>
     <textarea id="names" placeholder="每行一个人名，例如：&#10;张三&#10;李四&#10;王五&#10;（也支持用逗号、空格、分号分隔）"></textarea>
-    <div class="hint">支持换行、逗号、分号、空格分隔。重复的名字会自动去重。</div>
+    <div class="hint">支持换行、逗号、分号、空格分隔。重复的名字会自动去重。名单会<b>自动保存</b>在本浏览器，下次打开仍在。</div>
+    <div class="quick-add">
+      <input type="text" id="addName" placeholder="输入单个人名，回车或点「添加」追加到名单">
+      <button class="btn-ghost" id="addBtn">➕ 添加</button>
+    </div>
     <div class="option">
       <label for="bias">上轮靠前的人，本轮靠后的强度</label>
       <div class="slider-row">
@@ -165,6 +177,56 @@
     // 去重，保留首次出现顺序
     return [...new Set(parts)];
   }
+
+  // ===== 名单持久化（保存到浏览器 localStorage）=====
+  const STORE_KEY = 'teamDraw.names';
+  const namesEl = document.getElementById('names');
+
+  function saveNames() {
+    try { localStorage.setItem(STORE_KEY, namesEl.value); } catch (e) {}
+    updateSavedCount();
+  }
+
+  function loadNames() {
+    try {
+      const v = localStorage.getItem(STORE_KEY);
+      if (v != null) namesEl.value = v;
+    } catch (e) {}
+    updateSavedCount();
+  }
+
+  function updateSavedCount() {
+    const n = parseNames().length;
+    document.getElementById('savedCount').textContent = n > 0 ? `（已保存 ${n} 人）` : '';
+  }
+
+  // 文本框任何改动都自动保存
+  namesEl.addEventListener('input', saveNames);
+
+  // 单个添加：追加到名单（自动去重）
+  function addOneName() {
+    const inp = document.getElementById('addName');
+    const list = parseNames();
+    const seen = new Set(list);
+    const toAdd = inp.value.split(/[\n,，;；\s]+/).map(s => s.trim()).filter(Boolean);
+    let added = 0;
+    toAdd.forEach(name => {
+      if (!seen.has(name)) { list.push(name); seen.add(name); added++; }
+    });
+    namesEl.value = list.join('\n');
+    saveNames();
+    inp.value = '';
+    inp.focus();
+    if (toAdd.length > 0 && added === 0) {
+      inp.placeholder = '该人名已在名单中';
+      setTimeout(() => { inp.placeholder = '输入单个人名，回车或点「添加」追加到名单'; }, 1500);
+    }
+  }
+
+  document.getElementById('addBtn').addEventListener('click', addOneName);
+  document.getElementById('addName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addOneName(); }
+  });
 
   // Fisher-Yates 洗牌：保证每个元素出现且仅出现一次
   function shuffle(arr) {
@@ -298,7 +360,11 @@
     round = 0;
     rounds = [];
     roundInfo = [];
+    saveNames();   // 同步清空已保存名单
   });
+
+  // 页面打开时载入已保存的名单
+  loadNames();
 </script>
 </body>
 </html>
