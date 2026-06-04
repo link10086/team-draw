@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>团建组织人抽签小程序</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 24px;
+    color: #2d3748;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    display: grid;
+    gap: 20px;
+  }
+  h1 {
+    color: #fff;
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 6px rgba(0,0,0,.2);
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+  }
+  label { font-weight: 600; display: block; margin-bottom: 8px; }
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  textarea:focus { outline: none; border-color: #667eea; }
+  .hint { color: #718096; font-size: 13px; margin-top: 6px; }
+  .option { margin-top: 18px; }
+  .option > label { font-weight: 600; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
+  .slider-row input[type=range] { flex: 1; accent-color: #667eea; cursor: pointer; }
+  .slider-tip { font-size: 13px; color: #718096; white-space: nowrap; }
+  .slider-val {
+    flex: 0 0 auto; min-width: 38px; text-align: center;
+    background: #667eea; color: #fff; font-weight: 700;
+    font-size: 13px; padding: 3px 8px; border-radius: 6px;
+  }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+  button {
+    flex: 1;
+    min-width: 130px;
+    padding: 13px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .2s, opacity .2s;
+  }
+  button:active { transform: translateY(1px); }
+  .btn-primary { background: #667eea; color: #fff; box-shadow: 0 4px 12px rgba(102,126,234,.4); }
+  .btn-primary:hover { box-shadow: 0 6px 18px rgba(102,126,234,.55); }
+  .btn-ghost { background: #edf2f7; color: #4a5568; flex: 0 0 auto; min-width: 100px; }
+  .btn-ghost:hover { background: #e2e8f0; }
+  .round-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .round-head h2 { font-size: 18px; color: #4a5568; }
+  .badge {
+    background: #667eea; color: #fff; font-size: 13px;
+    padding: 4px 12px; border-radius: 999px;
+  }
+  ol.result {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+  ol.result li {
+    display: flex; align-items: center; gap: 14px;
+    background: #f7fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 17px;
+    animation: pop .35s ease both;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+  .num {
+    flex: 0 0 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    background: #667eea; color: #fff;
+    border-radius: 8px; font-weight: 700; font-size: 15px;
+  }
+  .empty { color: #a0aec0; text-align: center; padding: 30px 0; }
+  .history { margin-top: 4px; }
+  .history details { border-top: 1px solid #edf2f7; padding: 10px 0; }
+  .history summary { cursor: pointer; font-weight: 600; color: #4a5568; }
+  .history .order { color: #718096; font-size: 14px; margin-top: 8px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎲 团建组织人抽签小程序</h1>
+
+  <div class="card">
+    <label for="names">输入人名</label>
+    <textarea id="names" placeholder="每行一个人名，例如：&#10;张三&#10;李四&#10;王五&#10;（也支持用逗号、空格、分号分隔）"></textarea>
+    <div class="hint">支持换行、逗号、分号、空格分隔。重复的名字会自动去重。</div>
+    <div class="option">
+      <label for="bias">上轮靠前的人，本轮靠后的强度</label>
+      <div class="slider-row">
+        <span class="slider-tip">纯随机</span>
+        <input type="range" id="bias" min="0" max="2" step="0.1" value="1">
+        <span class="slider-tip">强</span>
+        <span class="slider-val" id="biasVal">1.0</span>
+      </div>
+      <div class="hint">第一轮始终为纯随机；之后按上一轮名次施加偏移（拉到最左即关闭，恢复纯随机）。</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="shuffleBtn">🔀 随机排序</button>
+      <button class="btn-ghost" id="exportBtn">📊 导出 Excel</button>
+      <button class="btn-ghost" id="clearBtn">清空</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="round-head">
+      <h2>排序结果</h2>
+      <span class="badge" id="roundBadge">第 0 轮</span>
+    </div>
+    <ol class="result" id="result">
+      <li class="empty">点击「随机排序」生成结果</li>
+    </ol>
+  </div>
+
+  <div class="card history" id="historyCard" style="display:none">
+    <h2 style="font-size:18px;color:#4a5568;margin-bottom:6px;">历史记录</h2>
+    <div id="history"></div>
+  </div>
+</div>
+
+<script>
+  let round = 0;
+  let rounds = [];     // 保存每一轮的排序结果，用于导出
+  let roundInfo = [];  // 保存每一轮使用的偏移强度（null 表示纯随机）
+
+  // 解析输入：按换行/逗号/分号/空格分隔，去除空白并去重
+  function parseNames() {
+    const raw = document.getElementById('names').value;
+    const parts = raw.split(/[\n,，;；\s]+/)
+                     .map(s => s.trim())
+                     .filter(s => s.length > 0);
+    // 去重，保留首次出现顺序
+    return [...new Set(parts)];
+  }
+
+  // Fisher-Yates 洗牌：保证每个元素出现且仅出现一次
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // 加权随机：上一轮越靠前(名次越小)的人，本轮越倾向靠后。
+  // 仍是 names 的一个排列，保证每人出现且仅出现一次。
+  function weightedShuffle(names, prevOrder, strength) {
+    const m = prevOrder.length;
+    const posOf = new Map();
+    prevOrder.forEach((name, i) => posOf.set(name, i + 1)); // 1-based 名次
+    return names
+      .map(name => {
+        let frontScore; // 1 表示上轮第一(最靠前)，0 表示上轮最后
+        if (posOf.has(name) && m > 1) {
+          frontScore = (m - posOf.get(name)) / (m - 1);
+        } else {
+          frontScore = 0.5; // 新加入或无有效上一轮 → 中性
+        }
+        // 小 key 靠前；frontScore 越高 → key 越大 → 越靠后
+        return { name, key: Math.random() + strength * frontScore };
+      })
+      .sort((a, b) => a.key - b.key)
+      .map(o => o.name);
+  }
+
+  function render(order) {
+    const ol = document.getElementById('result');
+    ol.innerHTML = '';
+    order.forEach((name, i) => {
+      const li = document.createElement('li');
+      li.style.animationDelay = (i * 0.04) + 's';
+      li.innerHTML = `<span class="num">${i + 1}</span><span>${escapeHtml(name)}</span>`;
+      ol.appendChild(li);
+    });
+    document.getElementById('roundBadge').textContent = '第 ' + round + ' 轮';
+  }
+
+  function modeLabel(info) {
+    return info == null ? '纯随机' : ('靠后偏移 ' + info.toFixed(1));
+  }
+
+  function addHistory(order, info) {
+    document.getElementById('historyCard').style.display = 'block';
+    const box = document.getElementById('history');
+    const d = document.createElement('details');
+    d.innerHTML = `<summary>第 ${round} 轮（${order.length} 人 · ${modeLabel(info)}）</summary>` +
+                  `<div class="order">${order.map((n,i)=>(i+1)+'. '+escapeHtml(n)).join('　')}</div>`;
+    box.prepend(d);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // 滑块数值实时显示
+  const biasSlider = document.getElementById('bias');
+  biasSlider.addEventListener('input', () => {
+    document.getElementById('biasVal').textContent = parseFloat(biasSlider.value).toFixed(1);
+  });
+
+  document.getElementById('shuffleBtn').addEventListener('click', () => {
+    const names = parseNames();
+    if (names.length === 0) {
+      alert('请先输入至少一个人名！');
+      return;
+    }
+    const strength = parseFloat(document.getElementById('bias').value);
+    // 第一轮、或强度为 0 时使用纯随机；否则按上一轮名次加权
+    let order, info;
+    if (rounds.length === 0 || strength === 0) {
+      order = shuffle(names);
+      info = null;            // 纯随机
+    } else {
+      order = weightedShuffle(names, rounds[rounds.length - 1], strength);
+      info = strength;        // 使用的偏移强度
+    }
+    round++;
+    rounds.push(order);
+    roundInfo.push(info);
+    render(order);
+    addHistory(order, info);
+  });
+
+  // 导出 Excel：每一轮一列，名次为行，方便横向对比
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    if (rounds.length === 0) {
+      alert('还没有任何排序结果，请先随机排序！');
+      return;
+    }
+    const maxLen = Math.max(...rounds.map(r => r.length));
+    let rows = '<tr><th>名次</th>' +
+               rounds.map((_, i) => `<th>第${i + 1}轮</th>`).join('') + '</tr>';
+    rows += '<tr><td>排序方式</td>' +
+            roundInfo.map(info => `<td>${modeLabel(info)}</td>`).join('') + '</tr>';
+    for (let i = 0; i < maxLen; i++) {
+      rows += '<tr><td>' + (i + 1) + '</td>' +
+              rounds.map(r => `<td>${escapeHtml(r[i] || '')}</td>`).join('') + '</tr>';
+    }
+    const html =
+      '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head>' +
+      '<meta charset="utf-8">' +
+      '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
+      '<x:Name>随机排序</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+      '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
+      '</head><body><table border="1">' + rows + '</table></body></html>';
+
+    const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '随机排序结果.xls';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('names').value = '';
+    document.getElementById('result').innerHTML = '<li class="empty">点击「随机排序」生成结果</li>';
+    document.getElementById('history').innerHTML = '';
+    document.getElementById('historyCard').style.display = 'none';
+    document.getElementById('roundBadge').textContent = '第 0 轮';
+    round = 0;
+    rounds = [];
+    roundInfo = [];
+  });
+</script>
+</body>
+</html>
