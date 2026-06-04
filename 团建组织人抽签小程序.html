@@ -143,7 +143,8 @@
     <div class="btn-row">
       <button class="btn-primary" id="shuffleBtn">🔀 随机排序</button>
       <button class="btn-ghost" id="exportBtn">📊 导出 Excel</button>
-      <button class="btn-ghost" id="clearBtn">清空</button>
+      <button class="btn-ghost" id="clearResultBtn">🧹 清空结果</button>
+      <button class="btn-ghost" id="clearNamesBtn">🗑 清空名单</button>
     </div>
   </div>
 
@@ -351,8 +352,8 @@
     URL.revokeObjectURL(url);
   });
 
-  document.getElementById('clearBtn').addEventListener('click', () => {
-    document.getElementById('names').value = '';
+  // 只清空排序结果与历史，保留名单
+  function clearResults() {
     document.getElementById('result').innerHTML = '<li class="empty">点击「随机排序」生成结果</li>';
     document.getElementById('history').innerHTML = '';
     document.getElementById('historyCard').style.display = 'none';
@@ -360,7 +361,18 @@
     round = 0;
     rounds = [];
     roundInfo = [];
+  }
+
+  document.getElementById('clearResultBtn').addEventListener('click', clearResults);
+
+  // 清空名单：连同已保存名单和结果一起清除，需二次确认
+  document.getElementById('clearNamesBtn').addEventListener('click', () => {
+    if (parseNames().length > 0 && !confirm('确定要清空整个名单吗？此操作会同时删除已保存的名单，不可恢复。')) {
+      return;
+    }
+    namesEl.value = '';
     saveNames();   // 同步清空已保存名单
+    clearResults();
   });
 
   // 页面打开时载入已保存的名单
